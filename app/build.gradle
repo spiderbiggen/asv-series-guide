@@ -3,6 +3,7 @@ apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-kapt'
 apply plugin: 'com.google.cloud.tools.endpoints-framework-client'
 apply plugin: 'io.fabric'
+apply plugin: 'jacoco'
 
 android {
     compileSdkVersion versions.compileSdk
@@ -278,4 +279,11 @@ def propertyOrEmpty(String name) {
 
 def propertyOrNull(String name) {
     return rootProject.hasProperty(name) ? "\"${rootProject.property(name)}\"" : "null"
+}
+
+task jacocoTestReport(type: JacocoReport, dependsOn: ['testPureDebugUnitTest']) {
+    reports {
+        xml.enabled true
+        html.enabled true
+    }
 }

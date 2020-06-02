@@ -57,6 +57,7 @@ public class ShowsActivityTest {
     }
 
 // TODO fix test
+//
 //    @Test
 //    public void testAddShowAndSetWatchedThenReturn() {
 //        // Added a sleep statement to match the app's execution delay.
