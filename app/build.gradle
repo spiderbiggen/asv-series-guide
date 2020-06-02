@@ -119,6 +119,7 @@ android {
             }
         }
         debug {
+            testCoverageEnabled true
             if (!rootProject.file('app/fabric.properties').exists()) {
                 ext.enableCrashlytics = false
             }
@@ -227,7 +228,7 @@ dependencies {
 
     // Amazon flavor specific
     amazonImplementation files('libs/amazon/in-app-purchasing-2.0.76.jar')
-    testAnnotationProcessor "com.google.auto.service:auto-service:1.0-rc4"
+    kaptAndroidTest "com.google.auto.service:auto-service:1.0-rc4"
 
     // Instrumented unit tests
     // https://developer.android.com/training/testing/release-notes
@@ -281,9 +282,8 @@ def propertyOrNull(String name) {
     return rootProject.hasProperty(name) ? "\"${rootProject.property(name)}\"" : "null"
 }
 
-task jacocoTestReport(type: JacocoReport, dependsOn: ['testPureDebugUnitTest']) {
-    reports {
-        xml.enabled true
-        html.enabled true
-    }
+jacoco {
+    toolVersion = "0.8.5"
+    reportsDir = file("$buildDir/jacocoReports")
+
 }

@@ -1,10 +1,13 @@
 pipeline {
-    agent { docker { image 'alvrme/alpine-android:android-29' } }
-    stages {
-        stage('test') {
-            steps {
-                sh 'gradlew jacocoTestReport'
-            }
+  agent { docker { image 'spiderbiggen/android' } }
+  stages {
+    stage('test') {
+      steps {
+        withCredentials([file(credentialsId: 'asv-secrets', variable: 'SECRET_PROPERTIES')]) {
+          sh 'cp $SECRET_PROPERTIES ./secret.properties'
+          sh './gradlew --stacktrace :app:createPureDebugCoverageReport :app:jacocoPureDebug'
         }
+      }
     }
+  }
 }
