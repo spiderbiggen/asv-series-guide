@@ -21,7 +21,7 @@ pipeline {
         sh './gradlew :app:testPureDebugUnitTest'
         // Analyse the test results and update the build result as appropriate
         junit '**/TEST-*.xml'
-        step([$class: 'JacocoPublisher'])
+        publishCoverage adapters: [jacocoAdapter('app/build/reports/jacoco/testPureDebugUnitTestCoverage/testPureDebugUnitTestCoverage.xml')]
       }
     }
   }
