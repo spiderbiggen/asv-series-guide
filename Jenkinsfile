@@ -5,15 +5,20 @@ pipeline {
     skipStagesAfterUnstable()
   }
   stages {
+    stage('Clean') {
+      steps {
+        sh './gradlew clean'
+      }
+    }
     stage('Compile') {
       steps {
         // Compile the app and its dependencies
         sh './gradlew compilePureDebugSources'
       }
     }
-    stage('test') {
+    stage('Test') {
       steps {
-        sh './gradlew --stacktrace testPureDebugUnitTest'
+        sh './gradlew :app:testPureDebugUnitTest'
         // Analyse the test results and update the build result as appropriate
         junit '**/TEST-*.xml'
         step([$class: 'JacocoPublisher'])
