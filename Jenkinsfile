@@ -11,6 +11,12 @@ pipeline {
         sh './gradlew compilePureDebugSources'
       }
     }
+    stage('dependencies') {
+      when { anyOf { branch '*test' } }
+      steps {
+        sh './gradlew :app:dependencies'
+      }
+    }
     stage('test') {
       steps {
         withCredentials([file(credentialsId: 'asv-secrets', variable: 'SECRET_PROPERTIES')]) {
