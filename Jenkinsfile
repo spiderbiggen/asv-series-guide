@@ -30,7 +30,7 @@ pipeline {
           string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_LOGIN'),
           string(credentialsId: 'SONAR_HOST_URL', variable: 'SONAR_HOST_URL')
         ]) {
-          sh './gradlew sonarqube -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.login=$SONAR_LOGIN'
+          sh './gradlew sonarqube -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.login=$SONAR_LOGIN -Dsonar.branch.name=$BRANCH_NAME'
         }
       }
     }
