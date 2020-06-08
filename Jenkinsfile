@@ -16,6 +16,7 @@ pipeline {
         sh './gradlew --stacktrace testPureDebugUnitTest'
         // Analyse the test results and update the build result as appropriate
         junit '**/TEST-*.xml'
+        step([$class: 'JacocoPublisher'])
       }
     }
   }
