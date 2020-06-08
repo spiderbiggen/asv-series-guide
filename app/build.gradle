@@ -68,6 +68,9 @@ android {
         unitTests {
             includeAndroidResources = true
         }
+        unitTests.all {
+            systemProperty 'user.home', System.getenv('HOME')
+        }
     }
 
     flavorDimensions "flavor"

@@ -43,11 +43,6 @@ buildscript {
         }
     }
     ext.isCiBuild = System.getenv('CI') == 'true'
-    testOptions {
-        unitTests.all {
-            systemProperty 'user.home', System.getenv('HOME')
-        }
-    }
     repositories {
         google()
         mavenCentral()
@@ -87,7 +82,6 @@ dependencyUpdates.resolutionStrategy {
 allprojects {
     repositories {
         google()
-        maven { url 'https://repo1.maven.org/maven2' }
         mavenCentral()
         maven { url 'https://jitpack.io' }
         jcenter()
