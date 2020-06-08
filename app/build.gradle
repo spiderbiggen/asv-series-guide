@@ -289,6 +289,10 @@ jacoco {
     toolVersion = "0.8.5"
 }
 
+tasks.withType(Test) {
+    jacoco.includeNoLocationClasses = true
+}
+
 project.afterEvaluate {
 
     android.applicationVariants.all { variant ->
