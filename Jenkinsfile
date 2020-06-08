@@ -15,7 +15,7 @@ pipeline {
       steps {
         withCredentials([file(credentialsId: 'asv-secrets', variable: 'SECRET_PROPERTIES')]) {
           sh 'cp $SECRET_PROPERTIES ./secret.properties'
-          sh './gradlew testPureDebugUnitTest'
+          sh './gradlew --stacktrace testPureDebugUnitTest'
           // Analyse the test results and update the build result as appropriate
           junit '**/TEST-*.xml'
         }
