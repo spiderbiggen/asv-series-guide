@@ -3,6 +3,7 @@ apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-kapt'
 apply plugin: 'com.google.cloud.tools.endpoints-framework-client'
 apply plugin: 'io.fabric'
+apply plugin: 'jacoco'
 
 android {
     compileSdkVersion versions.compileSdk
@@ -67,6 +68,9 @@ android {
         unitTests {
             includeAndroidResources = true
         }
+        unitTests.all {
+            systemProperty 'user.home', System.getenv('HOME')
+        }
     }
 
     flavorDimensions "flavor"
@@ -118,6 +122,7 @@ android {
             }
         }
         debug {
+            testCoverageEnabled true
             if (!rootProject.file('app/fabric.properties').exists()) {
                 ext.enableCrashlytics = false
             }
@@ -226,7 +231,7 @@ dependencies {
 
     // Amazon flavor specific
     amazonImplementation files('libs/amazon/in-app-purchasing-2.0.76.jar')
-    testAnnotationProcessor "com.google.auto.service:auto-service:1.0-rc4"
+    kaptAndroidTest "com.google.auto.service:auto-service:1.0-rc4"
 
     // Instrumented unit tests
     // https://developer.android.com/training/testing/release-notes
@@ -278,4 +283,10 @@ def propertyOrEmpty(String name) {
 
 def propertyOrNull(String name) {
     return rootProject.hasProperty(name) ? "\"${rootProject.property(name)}\"" : "null"
+}
+
+jacoco {
+    toolVersion = "0.8.5"
+    reportsDir = file("$buildDir/jacocoReports")
+
 }

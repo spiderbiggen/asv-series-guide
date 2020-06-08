@@ -18,7 +18,6 @@ import android.view.ViewGroup;
 import android.view.ViewParent;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.espresso.ViewInteraction;
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.rule.ActivityTestRule;
 import com.battlelancer.seriesguide.R;
 import com.battlelancer.seriesguide.provider.SeriesGuideContract;
@@ -29,7 +28,6 @@ import org.hamcrest.TypeSafeMatcher;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.runner.RunWith;
 
 /**
  * To avoid flakiness, turn off system animations on the virtual or physical devices used for
@@ -39,7 +37,6 @@ import org.junit.runner.RunWith;
  * - Transition animation scale
  * - Animator duration scale
  */
-@RunWith(AndroidJUnit4.class)
 public class ShowsActivityTest {
 
     @Rule
@@ -57,6 +54,7 @@ public class ShowsActivityTest {
     }
 
 // TODO fix test
+//
 //    @Test
 //    public void testAddShowAndSetWatchedThenReturn() {
 //        // Added a sleep statement to match the app's execution delay.
