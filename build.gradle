@@ -98,3 +98,7 @@ wrapper {
     //noinspection UnnecessaryQualifiedReference
     distributionType = Wrapper.DistributionType.ALL
 }
+
+sonarqube {
+    androidVariant 'pure'
+}

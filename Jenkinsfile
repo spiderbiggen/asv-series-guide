@@ -24,5 +24,15 @@ pipeline {
         publishCoverage adapters: [jacocoAdapter('app/build/reports/jacoco/testPureDebugUnitTestCoverage/testPureDebugUnitTestCoverage.xml')]
       }
     }
+    stage('SonarQube') {
+      steps {
+        withCredentials([
+          string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_LOGIN'),
+          string(credentialsId: 'SONAR_HOST_URL', variable: 'SONAR_HOST_URL')
+        ]) {
+          sh './gradlew sonarqube'
+        }
+      }
+    }
   }
 }
