@@ -5,17 +5,33 @@ pipeline {
     skipStagesAfterUnstable()
   }
   stages {
+    stage('Clean') {
+      steps {
+        sh './gradlew clean'
+      }
+    }
     stage('Compile') {
       steps {
         // Compile the app and its dependencies
         sh './gradlew compilePureDebugSources'
       }
     }
-    stage('test') {
+    stage('Test') {
       steps {
-        sh './gradlew --stacktrace testPureDebugUnitTest'
+        sh './gradlew :app:testPureDebugUnitTestCoverage'
         // Analyse the test results and update the build result as appropriate
         junit '**/TEST-*.xml'
+        publishCoverage adapters: [jacocoAdapter('app/build/reports/jacoco/testPureDebugUnitTestCoverage/testPureDebugUnitTestCoverage.xml')]
+      }
+    }
+    stage('SonarQube') {
+      steps {
+        withCredentials([
+          string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_LOGIN'),
+          string(credentialsId: 'SONAR_HOST_URL', variable: 'SONAR_HOST_URL')
+        ]) {
+          sh './gradlew sonarqube -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.login=$SONAR_LOGIN'
+        }
       }
     }
   }

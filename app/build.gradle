@@ -287,6 +287,46 @@ def propertyOrNull(String name) {
 
 jacoco {
     toolVersion = "0.8.5"
-    reportsDir = file("$buildDir/jacocoReports")
+}
 
+tasks.withType(Test) {
+    jacoco.includeNoLocationClasses = true
+    jacoco.excludes = ['jdk.internal.*']
+}
+
+project.afterEvaluate {
+
+    android.applicationVariants.all { variant ->
+        def variantName = variant.name
+        def testTaskName = "test${variantName.capitalize()}UnitTest"
+
+        tasks.create(name: "${testTaskName}Coverage", type: JacocoReport, dependsOn: "$testTaskName") {
+            def excludes = [
+                    '**/R.class',
+                    '**/R$*.class',
+                    '**/BuildConfig.*',
+                    '**/Manifest*.*',
+                    '**/*Test*.*',
+                    'android/**/*.*'
+            ]
+            def javaClasses = fileTree(dir: variant.javaCompiler.destinationDir, excludes: excludes)
+            def kotlinClasses = fileTree(dir: "${buildDir}/tmp/kotlin-classes/${variantName}", excludes: excludes)
+
+            classDirectories.from(files([ javaClasses, kotlinClasses ]))
+            sourceDirectories.from(files([
+                    "$project.projectDir/src/main/java",
+                    "$project.projectDir/src/${variantName}/java",
+                    "$project.projectDir/src/main/kotlin",
+                    "$project.projectDir/src/${variantName}/kotlin"
+            ]))
+
+            executionData.from(fileTree(dir: "$buildDir", includes: [
+                    "jacoco/test*.exec"
+            ]))
+            reports {
+                xml.enabled = true
+                html.enabled = true
+            }
+        }
+    }
 }
