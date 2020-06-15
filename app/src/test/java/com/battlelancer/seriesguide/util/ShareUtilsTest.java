@@ -13,6 +13,7 @@ import org.junit.runner.RunWith;
 import org.mockito.Mockito;
 import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PrepareForTest;
+import org.powermock.core.classloader.annotations.PrepareOnlyThisForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
 
 /**
@@ -21,7 +22,7 @@ import org.powermock.modules.junit4.PowerMockRunner;
  * @author Stefan Breetveld
  */
 @RunWith(PowerMockRunner.class)
-@PrepareForTest(ShareUtils.class)
+@PrepareOnlyThisForTest(ShareUtils.class)
 public class ShareUtilsTest {
 
     String tmdbMovieTitle;
@@ -37,6 +38,7 @@ public class ShareUtilsTest {
 
     @Before
     public void setup() {
+        // Arrange
         tmdbMovieTitle = "TestMovieSlug";
         tmdbMovieID = 1;
         tvdbShowSlug = "TestShowSlug";
@@ -50,7 +52,7 @@ public class ShareUtilsTest {
     }
 
     @Test
-    @PrepareForTest({TextTools.class, ShareUtils.class})
+    @PrepareOnlyThisForTest({TextTools.class, ShareUtils.class})
     public void testShareEpisode() throws Exception {
         // Arrange
         final String seasonXEpisode = String.format("%dx%02d", seasonNumber, episodeNumber);
@@ -88,7 +90,7 @@ public class ShareUtilsTest {
     }
 
     @Test
-    @PrepareForTest({TextTools.class, ShareUtils.class})
+    @PrepareOnlyThisForTest({TextTools.class, ShareUtils.class})
     public void testShareEpisodeNullSlug() throws Exception {
         // Arrange
         final String seasonXEpisode = String.format("%dx%02d", seasonNumber, episodeNumber);
@@ -127,7 +129,7 @@ public class ShareUtilsTest {
     }
 
     @Test
-    @PrepareForTest({TextTools.class, ShareUtils.class})
+    @PrepareOnlyThisForTest({TextTools.class, ShareUtils.class})
     public void testShareEpisodeEmptySlug() throws Exception {
         // Arrange
         final String seasonXEpisode = String.format("%dx%02d", seasonNumber, episodeNumber);
