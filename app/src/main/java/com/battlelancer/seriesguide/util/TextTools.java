@@ -13,6 +13,7 @@ import com.battlelancer.seriesguide.settings.DisplaySettings;
 import java.text.NumberFormat;
 import java.util.Date;
 import java.util.List;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Tools to help build text fragments to be used throughout the user interface.
@@ -28,9 +29,14 @@ public class TextTools {
      * 'S01E01', ...).
      */
     public static String getEpisodeNumber(Context context, int season, int episode) {
+        String format = DisplaySettings.getNumberFormat(context);
+        return getEpisodeNumberInternal(season, episode, format);
+    }
+
+    @NotNull
+    public static String getEpisodeNumberInternal(int season, int episode, String format) {
         NumberFormat numberFormat = NumberFormat.getIntegerInstance();
         numberFormat.setGroupingUsed(false);
-        String format = DisplaySettings.getNumberFormat(context);
         String result = numberFormat.format(season);
         if (DisplaySettings.NUMBERFORMAT_DEFAULT.equals(format)) {
             // 1x01 format
