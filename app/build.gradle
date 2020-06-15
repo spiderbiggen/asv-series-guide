@@ -267,6 +267,9 @@ dependencies {
     }
     testImplementation 'org.robolectric:robolectric:4.3.1'
 
+    testImplementation group: 'org.jacoco', name: 'org.jacoco.core', version: '0.8.5'
+    testImplementation group: 'org.jacoco', name: 'org.jacoco.ant', version: '0.8.5', classifier: 'nodeps'
+    testImplementation group: 'org.jacoco', name: 'org.jacoco.agent', version: '0.8.5', classifier: 'runtime'
 }
 
 endpointsClient {
@@ -299,6 +302,7 @@ project.afterEvaluate {
     android.applicationVariants.all { variant ->
         def variantName = variant.name
         def testTaskName = "test${variantName.capitalize()}UnitTest"
+        def offline_instrumented_outputDir = "$buildDir.path/intermediates/classes-instrumented/$variantName"
 
         tasks.create(name: "${testTaskName}Coverage", type: JacocoReport, dependsOn: "$testTaskName") {
             def excludes = [
@@ -309,10 +313,10 @@ project.afterEvaluate {
                     '**/*Test*.*',
                     'android/**/*.*'
             ]
-            def javaClasses = fileTree(dir: variant.javaCompiler.destinationDir, excludes: excludes)
+            def javaClasses = fileTree(dir: "$buildDir.path/intermediates/classes/$variantName", excludes: excludes)
             def kotlinClasses = fileTree(dir: "${buildDir}/tmp/kotlin-classes/${variantName}", excludes: excludes)
 
-            classDirectories.from(files([ javaClasses, kotlinClasses ]))
+            classDirectories.from(files([javaClasses, kotlinClasses]))
             sourceDirectories.from(files([
                     "$project.projectDir/src/main/java",
                     "$project.projectDir/src/${variantName}/java",
@@ -326,6 +330,31 @@ project.afterEvaluate {
             reports {
                 xml.enabled = true
                 html.enabled = true
+            }
+        }
+
+        gradle.taskGraph.whenReady { graph ->
+            if (graph.hasTask("instrument$variantName")) {
+                tasks.withType(Test) {
+                    doFirst {
+                        systemProperty "jacoco-agent.destfile${buildDir.path}/jacoco/${testTaskName}.exec"
+                        classpath = files(offline_instrumented_outputDir) + classpath + configurations.jacocoRuntime
+                    }
+                }
+            }
+        }
+
+        tasks.create(name: "instrument$variantName", dependsOn: "compile${variantName}UnitTestSources") {
+            doLast {
+                println 'Instrumenting classes'
+
+                ant.taskdef(name: 'instrument',
+                        classname: 'org.jacoco.ant.InstrumentTask',
+                        classpath: configurations.jacocoAnt.asPath)
+
+                ant.instrument(destdir: offline_instrumented_outputDir) {
+                    fileset(dir: "$buildDir.path/intermediates/classes/$variantName")
+                }
             }
         }
     }
