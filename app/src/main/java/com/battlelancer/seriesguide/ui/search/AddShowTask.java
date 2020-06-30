@@ -140,9 +140,7 @@ public class AddShowTask extends AsyncTask<Void, String, Void> {
     @Override
     protected Void doInBackground(Void... params) {
         Timber.d("Starting to add shows...");
-        if (!isProcess()) {
-            return null;
-        }
+        if (!isProcess()) return null;
 
         // if not connected to Hexagon, get episodes from trakt
         HashMap<Integer, BaseShow> traktCollection = null;
@@ -150,19 +148,17 @@ public class AddShowTask extends AsyncTask<Void, String, Void> {
         if (!HexagonSettings.isEnabled(context) && TraktCredentials.get(context).hasCredentials()) {
             Timber.d("Getting watched and collected episodes from trakt.");
             // get collection
-            HashMap<Integer, BaseShow> traktShows = getTraktShows("get collection", true);
-            if (traktShows == null) {
-                return null; // can not get collected state from trakt, give up.
-            }
-            traktCollection = traktShows;
-            // get watched
-            traktShows = getTraktShows("get watched", false);
-            if (traktShows == null) {
-                return null; // can not get watched state from trakt, give up.
-            }
-            traktWatched = traktShows;
+            traktCollection = getTraktShows("get collection", true);
+            traktWatched = getTraktShows("get watched", false);
+
+            if (traktCollection == null || traktWatched == null) return null; // can not get collected state from trakt, give up.
         }
 
+        return addShows(traktCollection, traktWatched);
+    }
+
+    private Void addShows(HashMap<Integer, BaseShow> traktCollection,
+            HashMap<Integer, BaseShow> traktWatched) {
         HexagonEpisodeSync hexagonEpisodeSync = new HexagonEpisodeSync(context, hexagonTools);
 
         int result;
