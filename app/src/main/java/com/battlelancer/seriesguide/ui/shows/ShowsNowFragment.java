@@ -31,6 +31,7 @@ import com.battlelancer.seriesguide.jobs.episodes.EpisodeWatchedJob;
 import com.battlelancer.seriesguide.provider.SeriesGuideContract;
 import com.battlelancer.seriesguide.traktapi.TraktCredentials;
 import com.battlelancer.seriesguide.ui.BaseMessageActivity;
+import com.battlelancer.seriesguide.ui.BaseNowFragment;
 import com.battlelancer.seriesguide.ui.ShowsActivity;
 import com.battlelancer.seriesguide.ui.episodes.EpisodesActivity;
 import com.battlelancer.seriesguide.ui.search.AddShowDialogFragment;
@@ -45,62 +46,17 @@ import org.greenrobot.eventbus.ThreadMode;
 /**
  * Displays recently watched episodes and recent episodes from friends (if connected to trakt).
  */
-public class ShowsNowFragment extends Fragment {
+public class ShowsNowFragment extends BaseNowFragment {
 
-    @BindView(R.id.swipeRefreshLayoutNow) EmptyViewSwipeRefreshLayout swipeRefreshLayout;
-
-    @BindView(R.id.recyclerViewNow) RecyclerView recyclerView;
-    @BindView(R.id.emptyViewNow) TextView emptyView;
-    @BindView(R.id.containerSnackbar) View snackbar;
-    @BindView(R.id.textViewSnackbar) TextView snackbarText;
-    @BindView(R.id.buttonSnackbar) Button snackbarButton;
-
-    private Unbinder unbinder;
-    private NowAdapter adapter;
     private boolean isLoadingRecentlyWatched;
     private boolean isLoadingFriends;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
             Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.fragment_now, container, false);
-        unbinder = ButterKnife.bind(this, view);
-
-        swipeRefreshLayout.setSwipeableChildren(R.id.scrollViewNow, R.id.recyclerViewNow);
-        swipeRefreshLayout.setOnRefreshListener(this::refreshStream);
-        swipeRefreshLayout.setProgressViewOffset(false,
-                getResources().getDimensionPixelSize(
-                        R.dimen.swipe_refresh_progress_bar_start_margin),
-                getResources().getDimensionPixelSize(
-                        R.dimen.swipe_refresh_progress_bar_end_margin));
+        View view = super.onCreateView(inflater, container, savedInstanceState);
 
         emptyView.setText(R.string.now_empty);
-
-        showError(null);
-        snackbarButton.setText(R.string.refresh);
-        snackbarButton.setOnClickListener(v -> refreshStream());
-
-        // recycler view layout manager
-        final int spanCount = getResources().getInteger(R.integer.grid_column_count);
-        final GridLayoutManager layoutManager = new GridLayoutManager(getActivity(), spanCount);
-        layoutManager.setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup() {
-            @Override
-            public int getSpanSize(int position) {
-                if (adapter == null) {
-                    return 1;
-                }
-                if (position >= adapter.getItemCount()) {
-                    return 1;
-                }
-                // make headers and more links span all columns
-                int type = adapter.getItem(position).type;
-                return (type == NowAdapter.ItemType.HEADER || type == NowAdapter.ItemType.MORE_LINK)
-                        ? spanCount : 1;
-            }
-        });
-        recyclerView.setLayoutManager(layoutManager);
-        recyclerView.setHasFixedSize(true);
-
         new ViewModelProvider(requireActivity()).get(ShowsActivityViewModel.class)
                 .getScrollTabToTopLiveData()
                 .observe(getViewLifecycleOwner(), tabPosition -> {
@@ -221,7 +177,8 @@ public class ShowsNowFragment extends Fragment {
         return super.onOptionsItemSelected(item);
     }
 
-    private void refreshStream() {
+    @Override
+    protected void refreshStream() {
         showProgressBar(true);
         showError(null);
 
@@ -269,20 +226,6 @@ public class ShowsNowFragment extends Fragment {
                         .makeScaleUpAnimation(view, 0, 0, view.getWidth(), view.getHeight())
                         .toBundle()
         );
-    }
-
-    private void showError(@Nullable String errorText) {
-        boolean show = errorText != null;
-        if (show) {
-            snackbarText.setText(errorText);
-        }
-        if (snackbar.getVisibility() == (show ? View.VISIBLE : View.GONE)) {
-            // already in desired state, avoid replaying animation
-            return;
-        }
-        snackbar.startAnimation(AnimationUtils.loadAnimation(snackbar.getContext(),
-                show ? R.anim.fade_in : R.anim.fade_out));
-        snackbar.setVisibility(show ? View.VISIBLE : View.GONE);
     }
 
     /**
@@ -348,7 +291,7 @@ public class ShowsNowFragment extends Fragment {
             // check if episode is in database
             Cursor query = requireActivity().getContentResolver()
                     .query(SeriesGuideContract.Episodes.buildEpisodeUri(item.episodeTvdbId),
-                            new String[] { SeriesGuideContract.Episodes._ID }, null, null, null);
+                            new String[]{SeriesGuideContract.Episodes._ID}, null, null, null);
             if (query == null) {
                 // query failed
                 return;
