@@ -27,6 +27,7 @@ import dagger.Lazy;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 import javax.inject.Inject;
 import org.greenrobot.eventbus.EventBus;
 import retrofit2.Response;
@@ -41,7 +42,9 @@ public class AddShowTask extends AsyncTask<Void, String, Void> {
     public static class OnShowAddedEvent {
 
         public final boolean successful;
-        /** Is -1 if add task was aborted. */
+        /**
+         * Is -1 if add task was aborted.
+         */
         public final int showTvdbId;
         private final String message;
 
@@ -137,22 +140,7 @@ public class AddShowTask extends AsyncTask<Void, String, Void> {
     @Override
     protected Void doInBackground(Void... params) {
         Timber.d("Starting to add shows...");
-
-        // don't even get started
-        if (addQueue.isEmpty()) {
-            Timber.d("Finished. Queue was empty.");
-            return null;
-        }
-
-        if (!AndroidUtils.isNetworkConnected(context)) {
-            Timber.d("Finished. No internet connection.");
-            SearchResult nextShow = addQueue.peek();
-            publishProgress(RESULT_OFFLINE, nextShow.getTvdbid(), nextShow.getTitle());
-            return null;
-        }
-
-        if (isCancelled()) {
-            Timber.d("Finished. Cancelled.");
+        if (!isProcess()) {
             return null;
         }
 
@@ -226,21 +214,7 @@ public class AddShowTask extends AsyncTask<Void, String, Void> {
                 if (!(isMergingShows && e.itemDoesNotExist())) {
                     failedMergingShows = true;
                 }
-                if (e.service() == TvdbException.Service.TVDB) {
-                    if (e.itemDoesNotExist()) {
-                        result = PROGRESS_ERROR_TVDB_NOT_EXISTS;
-                    } else {
-                        result = PROGRESS_ERROR_TVDB;
-                    }
-                } else if (e.service() == TvdbException.Service.TRAKT) {
-                    result = PROGRESS_ERROR_TRAKT;
-                } else if (e.service() == TvdbException.Service.HEXAGON) {
-                    result = PROGRESS_ERROR_HEXAGON;
-                } else if (e.service() == TvdbException.Service.DATA) {
-                    result = PROGRESS_ERROR_DATA;
-                } else {
-                    result = PROGRESS_ERROR;
-                }
+                result = handleException(e);
                 Timber.e(e, "Adding show failed");
             }
 
@@ -269,6 +243,45 @@ public class AddShowTask extends AsyncTask<Void, String, Void> {
 
         Timber.d("Finished adding shows.");
         return null;
+    }
+
+    private boolean isProcess() {
+        // don't even get started
+        if (addQueue.isEmpty()) {
+            Timber.d("Finished. Queue was empty.");
+            return false;
+        }
+
+        if (!AndroidUtils.isNetworkConnected(context)) {
+            Timber.d("Finished. No internet connection.");
+            SearchResult nextShow = addQueue.peek();
+            publishProgress(RESULT_OFFLINE, nextShow.getTvdbid(), nextShow.getTitle());
+            return false;
+        }
+
+        if (isCancelled()) {
+            Timber.d("Finished. Cancelled.");
+            return false;
+        }
+        return true;
+    }
+
+    private int handleException(TvdbException e) {
+        switch (Objects.requireNonNull(e.service())) {
+            case TVDB:
+                if (e.itemDoesNotExist()) {
+                    return PROGRESS_ERROR_TVDB_NOT_EXISTS;
+                }
+                return PROGRESS_ERROR_TVDB;
+            case TRAKT:
+                return PROGRESS_ERROR_TRAKT;
+            case HEXAGON:
+                return PROGRESS_ERROR_HEXAGON;
+            case DATA:
+                return PROGRESS_ERROR_DATA;
+            default:
+                return PROGRESS_ERROR;
+        }
     }
 
     @Override
