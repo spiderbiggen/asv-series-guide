@@ -9,23 +9,12 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.animation.AnimationUtils;
-import android.widget.Button;
-import android.widget.TextView;
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.ActivityOptionsCompat;
-import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.loader.app.LoaderManager;
 import androidx.loader.content.Loader;
-import androidx.recyclerview.widget.GridLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
-import butterknife.BindView;
-import butterknife.ButterKnife;
-import butterknife.Unbinder;
 import com.battlelancer.seriesguide.R;
 import com.battlelancer.seriesguide.jobs.episodes.EpisodeWatchedJob;
 import com.battlelancer.seriesguide.provider.SeriesGuideContract;
@@ -36,8 +25,6 @@ import com.battlelancer.seriesguide.ui.ShowsActivity;
 import com.battlelancer.seriesguide.ui.episodes.EpisodesActivity;
 import com.battlelancer.seriesguide.ui.search.AddShowDialogFragment;
 import com.battlelancer.seriesguide.ui.streams.HistoryActivity;
-import com.battlelancer.seriesguide.util.ViewTools;
-import com.uwetrottmann.seriesguide.widgets.EmptyViewSwipeRefreshLayout;
 import java.util.List;
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
@@ -47,9 +34,6 @@ import org.greenrobot.eventbus.ThreadMode;
  * Displays recently watched episodes and recent episodes from friends (if connected to trakt).
  */
 public class ShowsNowFragment extends BaseNowFragment {
-
-    private boolean isLoadingRecentlyWatched;
-    private boolean isLoadingFriends;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
@@ -72,42 +56,10 @@ public class ShowsNowFragment extends BaseNowFragment {
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
-
-        ViewTools.setSwipeRefreshLayoutColors(requireActivity().getTheme(), swipeRefreshLayout);
-
         // define dataset
         adapter = new NowAdapter(getActivity(), itemClickListener);
-        adapter.registerAdapterDataObserver(new RecyclerView.AdapterDataObserver() {
-            @Override
-            public void onChanged() {
-                updateEmptyState();
-            }
 
-            @Override
-            public void onItemRangeInserted(int positionStart, int itemCount) {
-                updateEmptyState();
-            }
-
-            @Override
-            public void onItemRangeRemoved(int positionStart, int itemCount) {
-                updateEmptyState();
-            }
-        });
-        recyclerView.setAdapter(adapter);
-
-        // if connected to trakt, replace local history with trakt history, show friends history
-        if (TraktCredentials.get(getActivity()).hasCredentials()) {
-            isLoadingRecentlyWatched = true;
-            isLoadingFriends = true;
-            showProgressBar(true);
-            LoaderManager loaderManager = LoaderManager.getInstance(this);
-            loaderManager.initLoader(ShowsActivity.NOW_TRAKT_USER_LOADER_ID, null,
-                    recentlyTraktCallbacks);
-            loaderManager.initLoader(ShowsActivity.NOW_TRAKT_FRIENDS_LOADER_ID, null,
-                    traktFriendsHistoryCallbacks);
-        }
-
-        setHasOptionsMenu(true);
+        super.onActivityCreated(adapter, recentlyTraktCallbacks, traktFriendsHistoryCallbacks);
     }
 
     @Override
@@ -146,13 +98,6 @@ public class ShowsNowFragment extends BaseNowFragment {
         super.onStop();
 
         EventBus.getDefault().unregister(this);
-    }
-
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-
-        unbinder.unbind();
     }
 
     @Override
@@ -206,12 +151,7 @@ public class ShowsNowFragment extends BaseNowFragment {
         }
     }
 
-    private void destroyLoaderIfExists(int loaderId) {
-        LoaderManager loaderManager = LoaderManager.getInstance(this);
-        if (loaderManager.getLoader(loaderId) != null) {
-            loaderManager.destroyLoader(loaderId);
-        }
-    }
+
 
     /**
      * Starts an activity to display the given episode.
@@ -226,26 +166,6 @@ public class ShowsNowFragment extends BaseNowFragment {
                         .makeScaleUpAnimation(view, 0, 0, view.getWidth(), view.getHeight())
                         .toBundle()
         );
-    }
-
-    /**
-     * Show or hide the progress bar of the {@link SwipeRefreshLayout}
-     * wrapping view.
-     */
-    private void showProgressBar(boolean show) {
-        // only hide if everybody has finished loading
-        if (!show) {
-            if (isLoadingRecentlyWatched || isLoadingFriends) {
-                return;
-            }
-        }
-        swipeRefreshLayout.setRefreshing(show);
-    }
-
-    private void updateEmptyState() {
-        boolean isEmpty = adapter.getItemCount() == 0;
-        recyclerView.setVisibility(isEmpty ? View.GONE : View.VISIBLE);
-        emptyView.setVisibility(isEmpty ? View.VISIBLE : View.GONE);
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
