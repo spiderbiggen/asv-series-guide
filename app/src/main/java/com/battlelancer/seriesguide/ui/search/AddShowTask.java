@@ -140,7 +140,9 @@ public class AddShowTask extends AsyncTask<Void, String, Void> {
     @Override
     protected Void doInBackground(Void... params) {
         Timber.d("Starting to add shows...");
-        if (!isProcess()) return null;
+        if (!isProcess()) {
+            return null;
+        }
 
         // if not connected to Hexagon, get episodes from trakt
         HashMap<Integer, BaseShow> traktCollection = null;
@@ -151,7 +153,9 @@ public class AddShowTask extends AsyncTask<Void, String, Void> {
             traktCollection = getTraktShows("get collection", true);
             traktWatched = getTraktShows("get watched", false);
 
-            if (traktCollection == null || traktWatched == null) return null; // can not get collected state from trakt, give up.
+            if (traktCollection == null || traktWatched == null) {
+                return null; // can not get collected state from trakt, give up.
+            }
         }
 
         return addShows(traktCollection, traktWatched);
@@ -178,45 +182,42 @@ public class AddShowTask extends AsyncTask<Void, String, Void> {
             String currentShowName = nextShow.getTitle();
             int currentShowTvdbId = nextShow.getTvdbid();
 
-            if (currentShowTvdbId <= 0) {
-                // Invalid TheTVDB ID, should never have been passed, report.
-                // Background: Hexagon gets requests with ID 0.
-                TvdbException invalidIdException = new TvdbException(
-                        "Show id invalid: " + currentShowTvdbId
-                                + ", silentMode=" + isSilentMode
-                                + ", merging=" + isMergingShows
-                );
-                Errors.logAndReport("Add show", invalidIdException);
-            } else {
-                if (!AndroidUtils.isNetworkConnected(context)) {
-                    Timber.d("Finished. No connection.");
-                    publishProgress(RESULT_OFFLINE, currentShowTvdbId, currentShowName);
-                    failedMergingShows = true;
-                    break;
-                }
-
-                try {
-                    boolean addedShow = tvdbTools
-                            .addShow(nextShow.getTvdbid(), nextShow.getLanguage(), traktCollection,
-                                    traktWatched, hexagonEpisodeSync);
-                    result = addedShow ? PROGRESS_SUCCESS : PROGRESS_EXISTS;
-                    addedAtLeastOneShow = addedShow
-                            || addedAtLeastOneShow; // do not overwrite previous success
-                } catch (TvdbException e) {
-                    // prevent a hexagon merge from failing if a show can not be added
-                    // because it does not exist (any longer)
-                    if (!(isMergingShows && e.itemDoesNotExist())) {
-                        failedMergingShows = true;
-                    }
-                    result = handleException(e);
-                    Timber.e(e, "Adding show failed");
-                }
-
-                publishProgress(result, currentShowTvdbId, currentShowName);
-                Timber.d("Finished adding show. (Result code: %s)", result);
+            if (isValid(currentShowTvdbId)) {
+                continue;
             }
+            if (!AndroidUtils.isNetworkConnected(context)) {
+                Timber.d("Finished. No connection.");
+                publishProgress(RESULT_OFFLINE, currentShowTvdbId, currentShowName);
+                failedMergingShows = true;
+                break;
+            }
+
+            try {
+                boolean addedShow = tvdbTools
+                        .addShow(nextShow.getTvdbid(), nextShow.getLanguage(), traktCollection,
+                                traktWatched, hexagonEpisodeSync);
+                result = addedShow ? PROGRESS_SUCCESS : PROGRESS_EXISTS;
+                addedAtLeastOneShow = addedShow
+                        || addedAtLeastOneShow; // do not overwrite previous success
+            } catch (TvdbException e) {
+                // prevent a hexagon merge from failing if a show can not be added
+                // because it does not exist (any longer)
+                if (!(isMergingShows && e.itemDoesNotExist())) {
+                    failedMergingShows = true;
+                }
+                result = handleException(e);
+                Timber.e(e, "Adding show failed");
+            }
+
+            publishProgress(result, currentShowTvdbId, currentShowName);
+            Timber.d("Finished adding show. (Result code: %s)", result);
         }
 
+        finnishAddShows(addedAtLeastOneShow, failedMergingShows);
+        return null;
+    }
+
+    private void finnishAddShows(boolean addedAtLeastOneShow, boolean failedMergingShows) {
         isFinishedAddingShows = true;
 
         // when merging shows down from Hexagon, set success flag
@@ -237,7 +238,21 @@ public class AddShowTask extends AsyncTask<Void, String, Void> {
         }
 
         Timber.d("Finished adding shows.");
-        return null;
+    }
+
+    private boolean isValid(int currentShowTvdbId) {
+        if (currentShowTvdbId <= 0) {
+            // Invalid TheTVDB ID, should never have been passed, report.
+            // Background: Hexagon gets requests with ID 0.
+            TvdbException invalidIdException = new TvdbException(
+                    "Show id invalid: " + currentShowTvdbId
+                            + ", silentMode=" + isSilentMode
+                            + ", merging=" + isMergingShows
+            );
+            Errors.logAndReport("Add show", invalidIdException);
+            return false;
+        }
+        return true;
     }
 
     private boolean isProcess() {
