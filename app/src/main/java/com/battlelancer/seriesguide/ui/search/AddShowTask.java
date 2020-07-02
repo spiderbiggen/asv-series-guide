@@ -197,14 +197,11 @@ public class AddShowTask extends AsyncTask<Void, String, Void> {
                         .addShow(nextShow.getTvdbid(), nextShow.getLanguage(), traktCollection,
                                 traktWatched, hexagonEpisodeSync);
                 result = addedShow ? PROGRESS_SUCCESS : PROGRESS_EXISTS;
-                addedAtLeastOneShow = addedShow
-                        || addedAtLeastOneShow; // do not overwrite previous success
+                addedAtLeastOneShow = addedShow || addedAtLeastOneShow; // do not overwrite previous success
             } catch (TvdbException e) {
                 // prevent a hexagon merge from failing if a show can not be added
                 // because it does not exist (any longer)
-                if (!(isMergingShows && e.itemDoesNotExist())) {
-                    failedMergingShows = true;
-                }
+                failedMergingShows = !(isMergingShows && e.itemDoesNotExist());
                 result = handleException(e);
                 Timber.e(e, "Adding show failed");
             }
