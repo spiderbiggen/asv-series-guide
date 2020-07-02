@@ -61,30 +61,18 @@ public class HexagonEpisodeSync {
         SparseArrayCompat<Long> showsLastWatchedMs = new SparseArrayCompat<>();
         while (hasMoreEpisodes) {
             try {
-                // get service each time to check if auth was removed
-                Episodes episodesService = hexagonTools.getEpisodesService();
-                if (episodesService == null) {
-                    return false;
-                }
-
-                Episodes.Get request = episodesService.get()
-                        .setUpdatedSince(lastSyncTime); // use default server limit
-                if (!TextUtils.isEmpty(cursor)) {
-                    request.setCursor(cursor);
-                }
-
-                EpisodeList response = request.execute();
-                if (response == null) {
+                EpisodeList episodeList = getEpisodeList(cursor, 0, true);
+                if (episodeList == null) {
                     // we're done here
                     Timber.d("downloadChangedFlags: response was null, done here");
                     break;
                 }
 
-                episodes = response.getEpisodes();
+                episodes = episodeList.getEpisodes();
 
                 // check for more items
-                if (response.getCursor() != null) {
-                    cursor = response.getCursor();
+                if (episodeList.getCursor() != null) {
+                    cursor = episodeList.getCursor();
                 } else {
                     hasMoreEpisodes = false;
                 }
@@ -183,30 +171,16 @@ public class HexagonEpisodeSync {
             }
 
             try {
-                // get service each time to check if auth was removed
-                Episodes episodesService = hexagonTools.getEpisodesService();
-                if (episodesService == null) {
-                    return false;
-                }
-
-                // build request
-                Episodes.Get request = episodesService.get()
-                        .setShowTvdbId(showTvdbId); // use default server limit
-                if (!TextUtils.isEmpty(cursor)) {
-                    request.setCursor(cursor);
-                }
-
-                // execute request
-                EpisodeList response = request.execute();
-                if (response == null) {
+                EpisodeList episodeList = getEpisodeList(cursor, showTvdbId, false);
+                if (episodeList == null) {
                     break;
                 }
 
-                episodes = response.getEpisodes();
+                episodes = episodeList.getEpisodes();
 
                 // check for more items
-                if (response.getCursor() != null) {
-                    cursor = response.getCursor();
+                if (episodeList.getCursor() != null) {
+                    cursor = episodeList.getCursor();
                 } else {
                     hasMoreEpisodes = false;
                 }
@@ -276,6 +250,25 @@ public class HexagonEpisodeSync {
         return true;
     }
 
+    private EpisodeList getEpisodeList(String cursor, int showTvdbId, boolean onlyChanged)
+            throws IOException {
+        Episodes episodesService = hexagonTools.getEpisodesService();
+        if (episodesService == null) {
+            throw new IOException("No episodeservice found");
+        }
+
+        // build request
+        Episodes.Get request = onlyChanged ?
+                episodesService.get().setUpdatedSince(new DateTime(HexagonSettings.getLastEpisodesSyncTime(context)))
+                : episodesService.get().setShowTvdbId(showTvdbId);
+        if (!TextUtils.isEmpty(cursor)) {
+            request.setCursor(cursor);
+        }
+
+        // execute request
+        return request.execute();
+    }
+
     private boolean updateLastWatchedTimeOfShows(SparseArrayCompat<Long> showsLastWatchedMs) {
         if (showsLastWatchedMs.size() == 0) {
             return true; // no episodes were watched, no last watched time to update
@@ -328,7 +321,7 @@ public class HexagonEpisodeSync {
      *
      * @return Whether the upload was successful.
      */
-    public boolean uploadFlags(int showTvdbId) {
+    boolean uploadFlags(int showTvdbId) {
         Timber.d("uploadFlags: for show %s", showTvdbId);
 
         // query for watched, skipped or collected episodes
