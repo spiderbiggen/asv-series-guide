@@ -192,29 +192,40 @@ public class AddShowTask extends AsyncTask<Void, String, Void> {
                 break;
             }
 
-            try {
-                boolean addedShow = tvdbTools
-                        .addShow(nextShow.getTvdbid(), nextShow.getLanguage(), traktCollection,
-                                traktWatched, hexagonEpisodeSync);
-                result = addedShow ? PROGRESS_SUCCESS : PROGRESS_EXISTS;
-                addedAtLeastOneShow = addedShow || addedAtLeastOneShow; // do not overwrite previous success
-            } catch (TvdbException e) {
+            result = addShow(nextShow, traktCollection, traktWatched, hexagonEpisodeSync);
+            final boolean successfullyAdded = isSuccessProgress(result);
+
+            // do not overwrite previous success
+            addedAtLeastOneShow = addedAtLeastOneShow || successfullyAdded;
+
+            if (!successfullyAdded) {
                 // prevent a hexagon merge from failing if a show can not be added
                 // because it does not exist (any longer)
-                failedMergingShows = !(isMergingShows && e.itemDoesNotExist());
-                result = handleException(e);
-                Timber.e(e, "Adding show failed");
+                failedMergingShows = !(isMergingShows && result == PROGRESS_ERROR_TVDB_NOT_EXISTS);
             }
 
             publishProgress(result, currentShowTvdbId, currentShowName);
             Timber.d("Finished adding show. (Result code: %s)", result);
         }
 
-        finnishAddShows(addedAtLeastOneShow, failedMergingShows);
+        finishAddShows(addedAtLeastOneShow, failedMergingShows);
         return null;
     }
 
-    private void finnishAddShows(boolean addedAtLeastOneShow, boolean failedMergingShows) {
+    private int addShow(SearchResult nextShow, HashMap<Integer, BaseShow> traktCollection,
+            HashMap<Integer, BaseShow> traktWatched, HexagonEpisodeSync hexagonEpisodeSync) {
+        try {
+            boolean addedShow = tvdbTools
+                    .addShow(nextShow.getTvdbid(), nextShow.getLanguage(), traktCollection,
+                            traktWatched, hexagonEpisodeSync);
+            return addedShow ? PROGRESS_SUCCESS : PROGRESS_EXISTS;
+        } catch (TvdbException e) {
+            Timber.e(e, "Adding show failed");
+            return handleException(e);
+        }
+    }
+
+    private void finishAddShows(boolean addedAtLeastOneShow, boolean failedMergingShows) {
         isFinishedAddingShows = true;
 
         // when merging shows down from Hexagon, set success flag
@@ -235,6 +246,10 @@ public class AddShowTask extends AsyncTask<Void, String, Void> {
         }
 
         Timber.d("Finished adding shows.");
+    }
+
+    private boolean isSuccessProgress(int progress) {
+        return progress == PROGRESS_EXISTS || progress == PROGRESS_SUCCESS;
     }
 
     private boolean isValid(int currentShowTvdbId) {
