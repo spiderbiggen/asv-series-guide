@@ -220,29 +220,28 @@ public class JsonExportTask extends AsyncTask<Void, Integer, Integer> {
                 return ERROR_FILE_ACCESS;
             }
 
-            ParcelFileDescriptor pfd = context.getContentResolver()
-                    .openFileDescriptor(backupFileUri, "w");
-            if (pfd == null) {
-                return ERROR_FILE_ACCESS;
+            try (ParcelFileDescriptor pfd = context.getContentResolver()
+                    .openFileDescriptor(backupFileUri, "w")) {
+                if (pfd == null) {
+                    return ERROR_FILE_ACCESS;
+                }
+                try (FileOutputStream out = new FileOutputStream(pfd.getFileDescriptor())) {
+
+                    // Even though using streams and FileOutputStream does not append by
+                    // default, using Storage Access Framework just overwrites existing
+                    // bytes, potentially leaving old bytes hanging over:
+                    // so truncate the file first to clear any existing bytes.
+                    out.getChannel().truncate(0);
+
+                    if (type == BACKUP_SHOWS) {
+                        writeJsonStreamShows(out, data);
+                    } else if (type == BACKUP_LISTS) {
+                        writeJsonStreamLists(out, data);
+                    } else if (type == BACKUP_MOVIES) {
+                        writeJsonStreamMovies(out, data);
+                    }
+                }
             }
-            FileOutputStream out = new FileOutputStream(pfd.getFileDescriptor());
-
-            // Even though using streams and FileOutputStream does not append by
-            // default, using Storage Access Framework just overwrites existing
-            // bytes, potentially leaving old bytes hanging over:
-            // so truncate the file first to clear any existing bytes.
-            out.getChannel().truncate(0);
-
-            if (type == BACKUP_SHOWS) {
-                writeJsonStreamShows(out, data);
-            } else if (type == BACKUP_LISTS) {
-                writeJsonStreamLists(out, data);
-            } else if (type == BACKUP_MOVIES) {
-                writeJsonStreamMovies(out, data);
-            }
-
-            // let the document provider know we're done.
-            pfd.close();
         } catch (FileNotFoundException e) {
             Timber.e(e, "Backup file not found.");
             removeBackupFileUri(type);

@@ -27,6 +27,7 @@ import dagger.Lazy;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 import javax.inject.Inject;
 import org.greenrobot.eventbus.EventBus;
 import retrofit2.Response;
@@ -41,7 +42,9 @@ public class AddShowTask extends AsyncTask<Void, String, Void> {
     public static class OnShowAddedEvent {
 
         public final boolean successful;
-        /** Is -1 if add task was aborted. */
+        /**
+         * Is -1 if add task was aborted.
+         */
         public final int showTvdbId;
         private final String message;
 
@@ -137,22 +140,7 @@ public class AddShowTask extends AsyncTask<Void, String, Void> {
     @Override
     protected Void doInBackground(Void... params) {
         Timber.d("Starting to add shows...");
-
-        // don't even get started
-        if (addQueue.isEmpty()) {
-            Timber.d("Finished. Queue was empty.");
-            return null;
-        }
-
-        if (!AndroidUtils.isNetworkConnected(context)) {
-            Timber.d("Finished. No internet connection.");
-            SearchResult nextShow = addQueue.peek();
-            publishProgress(RESULT_OFFLINE, nextShow.getTvdbid(), nextShow.getTitle());
-            return null;
-        }
-
-        if (isCancelled()) {
-            Timber.d("Finished. Cancelled.");
+        if (!isProcess()) {
             return null;
         }
 
@@ -162,19 +150,19 @@ public class AddShowTask extends AsyncTask<Void, String, Void> {
         if (!HexagonSettings.isEnabled(context) && TraktCredentials.get(context).hasCredentials()) {
             Timber.d("Getting watched and collected episodes from trakt.");
             // get collection
-            HashMap<Integer, BaseShow> traktShows = getTraktShows("get collection", true);
-            if (traktShows == null) {
+            traktCollection = getTraktShows("get collection", true);
+            traktWatched = getTraktShows("get watched", false);
+
+            if (traktCollection == null || traktWatched == null) {
                 return null; // can not get collected state from trakt, give up.
             }
-            traktCollection = traktShows;
-            // get watched
-            traktShows = getTraktShows("get watched", false);
-            if (traktShows == null) {
-                return null; // can not get watched state from trakt, give up.
-            }
-            traktWatched = traktShows;
         }
 
+        return addShows(traktCollection, traktWatched);
+    }
+
+    private Void addShows(HashMap<Integer, BaseShow> traktCollection,
+            HashMap<Integer, BaseShow> traktWatched) {
         HexagonEpisodeSync hexagonEpisodeSync = new HexagonEpisodeSync(context, hexagonTools);
 
         int result;
@@ -194,18 +182,9 @@ public class AddShowTask extends AsyncTask<Void, String, Void> {
             String currentShowName = nextShow.getTitle();
             int currentShowTvdbId = nextShow.getTvdbid();
 
-            if (currentShowTvdbId <= 0) {
-                // Invalid TheTVDB ID, should never have been passed, report.
-                // Background: Hexagon gets requests with ID 0.
-                TvdbException invalidIdException = new TvdbException(
-                        "Show id invalid: " + currentShowTvdbId
-                                + ", silentMode=" + isSilentMode
-                                + ", merging=" + isMergingShows
-                );
-                Errors.logAndReport("Add show", invalidIdException);
+            if (isValid(currentShowTvdbId)) {
                 continue;
             }
-
             if (!AndroidUtils.isNetworkConnected(context)) {
                 Timber.d("Finished. No connection.");
                 publishProgress(RESULT_OFFLINE, currentShowTvdbId, currentShowName);
@@ -213,41 +192,40 @@ public class AddShowTask extends AsyncTask<Void, String, Void> {
                 break;
             }
 
-            try {
-                boolean addedShow = tvdbTools
-                        .addShow(nextShow.getTvdbid(), nextShow.getLanguage(), traktCollection,
-                                traktWatched, hexagonEpisodeSync);
-                result = addedShow ? PROGRESS_SUCCESS : PROGRESS_EXISTS;
-                addedAtLeastOneShow = addedShow
-                        || addedAtLeastOneShow; // do not overwrite previous success
-            } catch (TvdbException e) {
+            result = addShow(nextShow, traktCollection, traktWatched, hexagonEpisodeSync);
+            final boolean successfullyAdded = isSuccessProgress(result);
+
+            // do not overwrite previous success
+            addedAtLeastOneShow = addedAtLeastOneShow || successfullyAdded;
+
+            if (!successfullyAdded) {
                 // prevent a hexagon merge from failing if a show can not be added
                 // because it does not exist (any longer)
-                if (!(isMergingShows && e.itemDoesNotExist())) {
-                    failedMergingShows = true;
-                }
-                if (e.service() == TvdbException.Service.TVDB) {
-                    if (e.itemDoesNotExist()) {
-                        result = PROGRESS_ERROR_TVDB_NOT_EXISTS;
-                    } else {
-                        result = PROGRESS_ERROR_TVDB;
-                    }
-                } else if (e.service() == TvdbException.Service.TRAKT) {
-                    result = PROGRESS_ERROR_TRAKT;
-                } else if (e.service() == TvdbException.Service.HEXAGON) {
-                    result = PROGRESS_ERROR_HEXAGON;
-                } else if (e.service() == TvdbException.Service.DATA) {
-                    result = PROGRESS_ERROR_DATA;
-                } else {
-                    result = PROGRESS_ERROR;
-                }
-                Timber.e(e, "Adding show failed");
+                failedMergingShows = !(isMergingShows && result == PROGRESS_ERROR_TVDB_NOT_EXISTS);
             }
 
             publishProgress(result, currentShowTvdbId, currentShowName);
             Timber.d("Finished adding show. (Result code: %s)", result);
         }
 
+        finishAddShows(addedAtLeastOneShow, failedMergingShows);
+        return null;
+    }
+
+    private int addShow(SearchResult nextShow, HashMap<Integer, BaseShow> traktCollection,
+            HashMap<Integer, BaseShow> traktWatched, HexagonEpisodeSync hexagonEpisodeSync) {
+        try {
+            boolean addedShow = tvdbTools
+                    .addShow(nextShow.getTvdbid(), nextShow.getLanguage(), traktCollection,
+                            traktWatched, hexagonEpisodeSync);
+            return addedShow ? PROGRESS_SUCCESS : PROGRESS_EXISTS;
+        } catch (TvdbException e) {
+            Timber.e(e, "Adding show failed");
+            return handleException(e);
+        }
+    }
+
+    private void finishAddShows(boolean addedAtLeastOneShow, boolean failedMergingShows) {
         isFinishedAddingShows = true;
 
         // when merging shows down from Hexagon, set success flag
@@ -268,7 +246,64 @@ public class AddShowTask extends AsyncTask<Void, String, Void> {
         }
 
         Timber.d("Finished adding shows.");
-        return null;
+    }
+
+    private boolean isSuccessProgress(int progress) {
+        return progress == PROGRESS_EXISTS || progress == PROGRESS_SUCCESS;
+    }
+
+    private boolean isValid(int currentShowTvdbId) {
+        if (currentShowTvdbId <= 0) {
+            // Invalid TheTVDB ID, should never have been passed, report.
+            // Background: Hexagon gets requests with ID 0.
+            TvdbException invalidIdException = new TvdbException(
+                    "Show id invalid: " + currentShowTvdbId
+                            + ", silentMode=" + isSilentMode
+                            + ", merging=" + isMergingShows
+            );
+            Errors.logAndReport("Add show", invalidIdException);
+            return false;
+        }
+        return true;
+    }
+
+    private boolean isProcess() {
+        // don't even get started
+        if (addQueue.isEmpty()) {
+            Timber.d("Finished. Queue was empty.");
+            return false;
+        }
+
+        if (!AndroidUtils.isNetworkConnected(context)) {
+            Timber.d("Finished. No internet connection.");
+            SearchResult nextShow = addQueue.peek();
+            publishProgress(RESULT_OFFLINE, nextShow.getTvdbid(), nextShow.getTitle());
+            return false;
+        }
+
+        if (isCancelled()) {
+            Timber.d("Finished. Cancelled.");
+            return false;
+        }
+        return true;
+    }
+
+    private int handleException(TvdbException e) {
+        switch (Objects.requireNonNull(e.service())) {
+            case TVDB:
+                if (e.itemDoesNotExist()) {
+                    return PROGRESS_ERROR_TVDB_NOT_EXISTS;
+                }
+                return PROGRESS_ERROR_TVDB;
+            case TRAKT:
+                return PROGRESS_ERROR_TRAKT;
+            case HEXAGON:
+                return PROGRESS_ERROR_HEXAGON;
+            case DATA:
+                return PROGRESS_ERROR_DATA;
+            default:
+                return PROGRESS_ERROR;
+        }
     }
 
     @Override
